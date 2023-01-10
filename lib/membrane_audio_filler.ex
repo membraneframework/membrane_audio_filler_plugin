@@ -8,25 +8,21 @@ defmodule Membrane.AudioFiller do
   alias Membrane.Buffer
   alias Membrane.RawAudio
 
-  def_options(
-    min_audio_loss: [
-      spec: Membrane.Time.t(),
-      default: 10_000,
-      description: """
-      Minimal time of audio loss in nanoseconds that filler should fill with silence
-      """
-    ]
-  )
+  def_options min_audio_loss: [
+                spec: Membrane.Time.t(),
+                default: Membrane.Time.nanoseconds(10_000),
+                description: """
+                Minimal time of audio loss in nanoseconds that filler should fill with silence
+                """
+              ]
 
-  def_input_pad(:input,
+  def_input_pad :input,
     caps: RawAudio,
     demand_mode: :auto
-  )
 
-  def_output_pad(:output,
+  def_output_pad :output,
     caps: RawAudio,
     demand_mode: :auto
-  )
 
   @impl true
   def handle_init(%__MODULE__{} = options) do
@@ -69,7 +65,7 @@ defmodule Membrane.AudioFiller do
            buffer
          ]}
       else
-        {state, [buffer]}
+        {%{state | lost_audio_duration: lost_audio_duration}, [buffer]}
       end
 
     {{:ok, [buffer: {:output, buffers}]},
