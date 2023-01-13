@@ -10,7 +10,7 @@ defmodule Membrane.AudioFiller do
 
   def_options min_audio_loss: [
                 spec: Membrane.Time.t(),
-                default: Membrane.Time.nanoseconds(10_000),
+                default: Membrane.Time.millisecond(),
                 description: """
                 Minimal time of audio loss in nanoseconds that filler should fill with silence
                 """
@@ -32,7 +32,6 @@ defmodule Membrane.AudioFiller do
       |> Map.merge(%{
         last_pts: nil,
         last_payload: nil,
-        lost_audio_duration: 0,
         caps: nil
       })
 
@@ -53,19 +52,18 @@ defmodule Membrane.AudioFiller do
   def handle_process(:input, buffer, _ctx, state) do
     pts_duration = buffer.pts - state.last_pts
     last_payload_duration = RawAudio.bytes_to_time(state.last_payload, state.caps)
-    lost_audio_duration = state.lost_audio_duration + (pts_duration - last_payload_duration)
+    lost_audio_duration = pts_duration - last_payload_duration
 
-    {state, buffers} =
+    buffers =
       if lost_audio_duration > state.min_audio_loss do
         new_pts = state.last_pts + last_payload_duration
 
-        {%{state | lost_audio_duration: 0},
-         [
-           %Buffer{pts: new_pts, payload: RawAudio.silence(state.caps, lost_audio_duration)},
-           buffer
-         ]}
+        [
+          %Buffer{pts: new_pts, payload: RawAudio.silence(state.caps, lost_audio_duration)},
+          buffer
+        ]
       else
-        {%{state | lost_audio_duration: lost_audio_duration}, [buffer]}
+        [buffer]
       end
 
     {{:ok, [buffer: {:output, buffers}]},

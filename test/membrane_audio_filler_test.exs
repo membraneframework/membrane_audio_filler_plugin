@@ -64,6 +64,32 @@ defmodule Membrane.AudioFillerTest do
     Pipeline.terminate(pipeline, blocking?: true)
   end
 
+  test "AudioFiller doesn't create additional buffers when hole in audio stream is smaller then min_audio_loss" do
+    buffer_duration = Membrane.Time.millisecond() / 2
+
+    wrong_buffer_generator = fn x ->
+      %Buffer{pts: buffer_duration * 2 * x, payload: RawAudio.silence(@caps, buffer_duration)}
+    end
+
+    {:ok, pipeline} = build_pipeline(wrong_buffer_generator)
+
+    assert_end_of_stream(pipeline, :sink)
+
+    Enum.each(0..9, fn x ->
+      pts = buffer_duration * 2 * x
+      payload = RawAudio.silence(@caps, buffer_duration)
+
+      assert_sink_buffer(pipeline, :sink, %Membrane.Buffer{
+        pts: ^pts,
+        payload: ^payload
+      })
+    end)
+
+    refute_sink_buffer(pipeline, :sink, Membrane.Buffer)
+
+    Pipeline.terminate(pipeline, blocking?: true)
+  end
+
   defp source_generator(%{buffers_no: buffers_no, pts: pts} = state, size) do
     size = min(size, buffers_no)
     new_buffers_no = buffers_no - size
