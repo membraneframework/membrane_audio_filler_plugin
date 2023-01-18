@@ -31,42 +31,44 @@ defmodule Membrane.AudioFiller do
       |> Map.from_struct()
       |> Map.merge(%{
         last_pts: nil,
-        last_payload: nil,
-        caps: nil
+        last_payload_duration: nil
       })
 
     {:ok, state}
   end
 
   @impl true
-  def handle_caps(:input, %RawAudio{} = caps, _context, state),
-    do: {{:ok, caps: {:output, caps}}, %{state | caps: caps}}
+  def handle_process(:input, buffer, ctx, %{last_pts: nil} = state) do
+    last_payload_duration = RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.caps)
+
+    {{:ok, [buffer: {:output, buffer}]},
+     %{state | last_pts: buffer.pts, last_payload_duration: last_payload_duration}}
+  end
 
   @impl true
-  def handle_process(:input, buffer, _ctx, %{last_pts: nil} = state),
-    do:
-      {{:ok, [buffer: {:output, buffer}]},
-       %{state | last_pts: buffer.pts, last_payload: byte_size(buffer.payload)}}
-
-  @impl true
-  def handle_process(:input, buffer, _ctx, state) do
+  def handle_process(:input, buffer, ctx, state) do
     pts_duration = buffer.pts - state.last_pts
-    last_payload_duration = RawAudio.bytes_to_time(state.last_payload, state.caps)
-    lost_audio_duration = pts_duration - last_payload_duration
+    lost_audio_duration = pts_duration - state.last_payload_duration
 
     buffers =
       if lost_audio_duration > state.min_audio_loss do
-        new_pts = state.last_pts + last_payload_duration
+        new_pts = state.last_pts + state.last_payload_duration
 
         [
-          %Buffer{pts: new_pts, payload: RawAudio.silence(state.caps, lost_audio_duration)},
+          %Buffer{
+            pts: new_pts,
+            payload: RawAudio.silence(ctx.pads.input.caps, lost_audio_duration)
+          },
           buffer
         ]
       else
         [buffer]
       end
 
+    current_payload_duration =
+      RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.caps)
+
     {{:ok, [buffer: {:output, buffers}]},
-     %{state | last_pts: buffer.pts, last_payload: byte_size(buffer.payload)}}
+     %{state | last_pts: buffer.pts, last_payload_duration: current_payload_duration}}
   end
 end
