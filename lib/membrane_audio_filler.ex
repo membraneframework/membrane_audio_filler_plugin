@@ -17,15 +17,15 @@ defmodule Membrane.AudioFiller do
               ]
 
   def_input_pad :input,
-    caps: RawAudio,
+    accepted_format: RawAudio,
     demand_mode: :auto
 
   def_output_pad :output,
-    caps: RawAudio,
+    accepted_format: RawAudio,
     demand_mode: :auto
 
   @impl true
-  def handle_init(%__MODULE__{} = options) do
+  def handle_init(_context, %__MODULE__{} = options) do
     state =
       options
       |> Map.from_struct()
@@ -34,14 +34,15 @@ defmodule Membrane.AudioFiller do
         last_payload_duration: nil
       })
 
-    {:ok, state}
+    {[], state}
   end
 
   @impl true
   def handle_process(:input, buffer, ctx, %{last_pts: nil} = state) do
-    last_payload_duration = RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.caps)
+    last_payload_duration =
+      RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.stream_format)
 
-    {{:ok, [buffer: {:output, buffer}]},
+    {[buffer: {:output, buffer}],
      %{state | last_pts: buffer.pts, last_payload_duration: last_payload_duration}}
   end
 
@@ -57,7 +58,7 @@ defmodule Membrane.AudioFiller do
         [
           %Buffer{
             pts: new_pts,
-            payload: RawAudio.silence(ctx.pads.input.caps, lost_audio_duration)
+            payload: RawAudio.silence(ctx.pads.input.stream_format, lost_audio_duration)
           },
           buffer
         ]
@@ -66,9 +67,9 @@ defmodule Membrane.AudioFiller do
       end
 
     current_payload_duration =
-      RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.caps)
+      RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.stream_format)
 
-    {{:ok, [buffer: {:output, buffers}]},
+    {[buffer: {:output, buffers}],
      %{state | last_pts: buffer.pts, last_payload_duration: current_payload_duration}}
   end
 end

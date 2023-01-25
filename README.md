@@ -1,4 +1,4 @@
-# Membrane Template Plugin
+# Membrane Audio Filler Plugin
 
 [![Hex.pm](https://img.shields.io/hexpm/v/membrane_audio_filler_plugin.svg)](https://hex.pm/packages/membrane_audio_filler_plugin)
 [![API Docs](https://img.shields.io/badge/api-docs-yellow.svg?style=flat)](https://hexdocs.pm/membrane_audio_filler_plugin)
