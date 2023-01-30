@@ -5,12 +5,13 @@ defmodule Membrane.AudioFillerTest do
   use ExUnit.Case
 
   import Membrane.Testing.Assertions
+  import Membrane.ChildrenSpec
 
   alias Membrane.Buffer
   alias Membrane.RawAudio
   alias Membrane.Testing.Pipeline
 
-  @caps %RawAudio{
+  @stream_format %RawAudio{
     channels: 1,
     sample_rate: 48_000,
     sample_format: :s16le
@@ -20,16 +21,19 @@ defmodule Membrane.AudioFillerTest do
     buffer_duration = Membrane.Time.milliseconds(10)
 
     buffer_generator = fn x ->
-      %Buffer{pts: buffer_duration * x, payload: RawAudio.silence(@caps, buffer_duration)}
+      %Buffer{
+        pts: buffer_duration * x,
+        payload: RawAudio.silence(@stream_format, buffer_duration)
+      }
     end
 
-    {:ok, pipeline} = build_pipeline(buffer_generator)
+    pipeline = build_pipeline(buffer_generator)
 
     assert_end_of_stream(pipeline, :sink)
 
     Enum.each(0..9, fn x ->
       pts = buffer_duration * x
-      payload = RawAudio.silence(@caps, buffer_duration)
+      payload = RawAudio.silence(@stream_format, buffer_duration)
 
       assert_sink_buffer(pipeline, :sink, %Membrane.Buffer{
         pts: ^pts,
@@ -44,22 +48,54 @@ defmodule Membrane.AudioFillerTest do
     buffer_duration = Membrane.Time.milliseconds(10)
 
     wrong_buffer_generator = fn x ->
-      %Buffer{pts: buffer_duration * 2 * x, payload: RawAudio.silence(@caps, buffer_duration)}
+      %Buffer{
+        pts: buffer_duration * 2 * x,
+        payload: RawAudio.silence(@stream_format, buffer_duration)
+      }
     end
 
-    {:ok, pipeline} = build_pipeline(wrong_buffer_generator)
+    pipeline = build_pipeline(wrong_buffer_generator)
 
     assert_end_of_stream(pipeline, :sink)
 
     Enum.each(0..18, fn x ->
       pts = buffer_duration * x
-      payload = RawAudio.silence(@caps, buffer_duration)
+      payload = RawAudio.silence(@stream_format, buffer_duration)
 
       assert_sink_buffer(pipeline, :sink, %Membrane.Buffer{
         pts: ^pts,
         payload: ^payload
       })
     end)
+
+    Pipeline.terminate(pipeline, blocking?: true)
+  end
+
+  test "AudioFiller doesn't create additional buffers when hole in audio stream is smaller then min_audio_loss" do
+    buffer_duration = Membrane.Time.millisecond() / 2
+
+    wrong_buffer_generator = fn x ->
+      %Buffer{
+        pts: buffer_duration * 2 * x,
+        payload: RawAudio.silence(@stream_format, buffer_duration)
+      }
+    end
+
+    pipeline = build_pipeline(wrong_buffer_generator)
+
+    assert_end_of_stream(pipeline, :sink)
+
+    Enum.each(0..9, fn x ->
+      pts = buffer_duration * 2 * x
+      payload = RawAudio.silence(@stream_format, buffer_duration)
+
+      assert_sink_buffer(pipeline, :sink, %Membrane.Buffer{
+        pts: ^pts,
+        payload: ^payload
+      })
+    end)
+
+    refute_sink_buffer(pipeline, :sink, Membrane.Buffer)
 
     Pipeline.terminate(pipeline, blocking?: true)
   end
@@ -78,26 +114,31 @@ defmodule Membrane.AudioFillerTest do
         else: [buffer: {:output, buffers}]
 
     last_buffer = List.last(buffers)
-    new_pts = last_buffer.pts + RawAudio.bytes_to_time(byte_size(last_buffer.payload), state.caps)
+
+    new_pts =
+      last_buffer.pts +
+        RawAudio.bytes_to_time(byte_size(last_buffer.payload), state.stream_format)
+
     {actions, %{state | buffers_no: new_buffers_no, pts: new_pts}}
   end
 
   defp build_pipeline(buffer_generator) do
-    children = [
-      source: %Membrane.Testing.Source{
-        caps: @caps,
+    structure = [
+      child(:source, %Membrane.Testing.Source{
+        stream_format: @stream_format,
         output:
-          {%{buffer_generator: buffer_generator, caps: @caps, buffers_no: 10, pts: 0},
-           &source_generator/2}
-      },
-      filler: Membrane.AudioFiller,
-      sink: Membrane.Testing.Sink
+          {%{
+             buffer_generator: buffer_generator,
+             stream_format: @stream_format,
+             buffers_no: 10,
+             pts: 0
+           }, &source_generator/2}
+      }),
+      get_child(:source)
+      |> child(:filler, Membrane.AudioFiller)
+      |> child(:sink, Membrane.Testing.Sink)
     ]
 
-    options = [
-      links: Membrane.ParentSpec.link_linear(children)
-    ]
-
-    Pipeline.start_link(options)
+    Pipeline.start_link_supervised!(structure: structure)
   end
 end
