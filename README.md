@@ -15,7 +15,7 @@ The package can be installed by adding `membrane_audio_filler_plugin` to your li
 ```elixir
 def deps do
   [
-    {:membrane_audio_filler_plugin, "~> 0.1.0"}
+	{:membrane_audio_filler_plugin, "~> 0.2.0"}
   ]
 end
 ```
