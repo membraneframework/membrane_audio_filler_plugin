@@ -1,7 +1,7 @@
 defmodule Membrane.AudioFiller.Mixfile do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @github_url "https://github.com/membraneframework/membrane_audio_filler_plugin"
 
   def project do
@@ -41,7 +41,7 @@ defmodule Membrane.AudioFiller.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:dialyxir, ">= 0.0.0", only: :dev, runtime: false},
       {:credo, ">= 0.0.0", only: :dev, runtime: false},
-      {:membrane_raw_audio_format, "~> 0.10.0"}
+      {:membrane_raw_audio_format, "~> 0.11.0"}
     ]
   end
 
