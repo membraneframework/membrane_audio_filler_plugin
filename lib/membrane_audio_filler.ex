@@ -16,13 +16,8 @@ defmodule Membrane.AudioFiller do
                 """
               ]
 
-  def_input_pad :input,
-    accepted_format: RawAudio,
-    demand_mode: :auto
-
-  def_output_pad :output,
-    accepted_format: RawAudio,
-    demand_mode: :auto
+  def_input_pad :input, accepted_format: RawAudio
+  def_output_pad :output, accepted_format: RawAudio
 
   @impl true
   def handle_init(_context, %__MODULE__{} = options) do
@@ -38,7 +33,7 @@ defmodule Membrane.AudioFiller do
   end
 
   @impl true
-  def handle_process(:input, buffer, ctx, %{last_pts: nil} = state) do
+  def handle_buffer(:input, buffer, ctx, %{last_pts: nil} = state) do
     last_payload_duration =
       RawAudio.bytes_to_time(byte_size(buffer.payload), ctx.pads.input.stream_format)
 
@@ -47,7 +42,7 @@ defmodule Membrane.AudioFiller do
   end
 
   @impl true
-  def handle_process(:input, buffer, ctx, state) do
+  def handle_buffer(:input, buffer, ctx, state) do
     pts_duration = buffer.pts - state.last_pts
     lost_audio_duration = pts_duration - state.last_payload_duration
 
