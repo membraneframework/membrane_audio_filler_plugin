@@ -41,7 +41,7 @@ defmodule Membrane.AudioFillerTest do
       })
     end)
 
-    Pipeline.terminate(pipeline, blocking?: true)
+    Pipeline.terminate(pipeline)
   end
 
   test "AudioFiller returns the same buffers as its gets plus additional buffers to fill holes in audio stream" do
@@ -68,7 +68,7 @@ defmodule Membrane.AudioFillerTest do
       })
     end)
 
-    Pipeline.terminate(pipeline, blocking?: true)
+    Pipeline.terminate(pipeline)
   end
 
   test "AudioFiller doesn't create additional buffers when hole in audio stream is smaller then min_audio_loss" do
@@ -97,7 +97,7 @@ defmodule Membrane.AudioFillerTest do
 
     refute_sink_buffer(pipeline, :sink, Membrane.Buffer)
 
-    Pipeline.terminate(pipeline, blocking?: true)
+    Pipeline.terminate(pipeline)
   end
 
   defp source_generator(%{buffers_no: buffers_no, pts: pts} = state, size) do
@@ -123,7 +123,7 @@ defmodule Membrane.AudioFillerTest do
   end
 
   defp build_pipeline(buffer_generator) do
-    structure = [
+    spec = [
       child(:source, %Membrane.Testing.Source{
         stream_format: @stream_format,
         output:
@@ -139,6 +139,6 @@ defmodule Membrane.AudioFillerTest do
       |> child(:sink, Membrane.Testing.Sink)
     ]
 
-    Pipeline.start_link_supervised!(structure: structure)
+    Pipeline.start_link_supervised!(spec: spec)
   end
 end
